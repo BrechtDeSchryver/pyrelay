@@ -1,0 +1,4 @@
+pycryptodomex
+requests
+pysocks
+fastapi
