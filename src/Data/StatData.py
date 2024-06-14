@@ -1,23 +1,29 @@
-from Constants.StatTypes import StatTypes, nameOf
-
+from Constants.Constants import Constants
 class StatData:
     def __init__(self, statType=0, statValue=0, strStatValue="", secondaryValue=0):
+        self.constants = Constants() # change this funky wunky malloc 
         self.statType = statType
         self.statValue = statValue
         self.strStatValue = strStatValue
         self.secondaryValue = secondaryValue
 
     def isStringStat(self):
-        return self.statType in [StatTypes.EXPSTAT, StatTypes.NAMESTAT, StatTypes.ACCOUNTIDSTAT, StatTypes.GUILDNAMESTAT,
-                                 StatTypes.PETNAMESTAT, StatTypes.GRAVEACCOUNTID, StatTypes.OWNERACCOUNTIDSTAT,
-                                 StatTypes.ENCHANTMENTS, StatTypes.UNKNOWN121, StatTypes.UNKNOWN127, StatTypes.UNKNOWN128,
-                                 StatTypes.UNKNOWN147, StatTypes.DUSTAMOUNT, StatTypes.DUSTLIMIT]
+        return self.statType in [self.constants.statTypesToInt.get("EXPSTAT"), self.constants.statTypesToInt.get("NAMESTAT"), self.constants.statTypesToInt.get("ACCOUNTIDSTAT"), self.constants.statTypesToInt.get("GUILDNAMESTAT"),
+                                 self.constants.statTypesToInt.get("PETNAMESTAT"), self.constants.statTypesToInt.get("GRAVEACCOUNTID"), self.constants.statTypesToInt.get("OWNERACCOUNTIDSTAT"),
+                                 self.constants.statTypesToInt.get("ENCHANTMENTS"), self.constants.statTypesToInt.get("UNKNOWN121"), self.constants.statTypesToInt.get("UNKNOWN127"), self.constants.statTypesToInt.get("UNKNOWN128"),
+                                 self.constants.statTypesToInt.get("UNKNOWN147"), self.constants.statTypesToInt.get("DUSTAMOUNT"), self.constants.statTypesToInt.get("DUSTLIMIT")]
+    def nameOf(self,statType):
+        if statType in self.constants.statTypesToInt.values():
+            for key in self.constants.statTypesToInt.keys():
+                if statType == self.constants.statTypesToInt[key]:
+                    return key
+        return "UNKNOWNSTAT"
 
     def statToName(self, statType=None):
         if statType is None:
-            return nameOf(self.statType)
+            return self.nameOf(self.statType)
         else:
-            return nameOf(statType)   
+            return self.nameOf(statType)   
 
     def read(self, reader):
         self.statType = reader.readUnsignedByte()

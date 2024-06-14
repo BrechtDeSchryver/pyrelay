@@ -4,8 +4,8 @@ import logging
 import warnings
 import threading
 
-from ClientManager import ClientManager
-
+from Client.ClientManager import ClientManager
+from Constants.Constants import Constants
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -13,10 +13,10 @@ async def lifespan(app: FastAPI):
     Takes in a FastAPI instance as a parameter.
     Yields control back to the caller after startup configurations are completed.
     """
-    app.clientMan = ClientManager()
+    app.constants = Constants()
+    app.clientMan = ClientManager(app.constants)
     #app.clientMan.updateServers = True
 
-    # Start the reconnect loop in a separate thread
     reconnect_thread = threading.Thread(target=app.clientMan.reconnect_loop)
     reconnect_thread.start()
 

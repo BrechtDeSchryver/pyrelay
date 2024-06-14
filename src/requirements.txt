@@ -2,3 +2,5 @@ pycryptodomex
 requests
 pysocks
 fastapi
+pydantic
+pydantic_settings

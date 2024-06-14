@@ -8,17 +8,18 @@ import struct
 import time
 
 import Crypto.RC4 as RC4
-import Constants.PacketIds as PacketId
 import Networking.Writer as Writer
 import Networking.Reader as Reader
 import Networking.PacketHelper as PacketHelper
+from Constants.Constants import Constants
 
 HEADERSIZE = 5
 PORT = 2050
 
 class SocketManager:
-    def __init__(self):
+    def __init__(self,constants:Constants):
         self.hooks = {}
+        self.constants = constants
         self.ip = None
         self.sock = None
         self.active = True
@@ -125,7 +126,7 @@ class SocketManager:
                 recv = self.sock.recv(size-len(msg))
                 msg += self.incomming_decoder.process(recv)
             try:
-                packet_type = PacketId.idToType[packet_id]
+                packet_type = self.constants.idToType.get(packet_id)
             except KeyError:
 ##                print("Unknown packet id:", packet_id)
 ##                print(msg)
@@ -155,8 +156,8 @@ class SocketManager:
         if self.connected:
             self.writer.reset()
             packet.write(self.writer)
-            print(packet.type.lower())
-            self.writer.writeHeader(PacketId.typeToId[packet.type])
+            #print(packet.type.lower())
+            self.writer.writeHeader(self.constants.typeToId.get(packet.type))
             self.writer.buffer = self.writer.buffer[:5] + self.outgoing_encoder.process(self.writer.buffer[5:])
             try:
                 self.sock.sendall(bytes(self.writer.buffer))

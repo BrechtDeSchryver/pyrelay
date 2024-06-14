@@ -1,13 +1,15 @@
-import urllib.parse
-import Constants.ApiPoints as ApiPoints
+from xml.etree import ElementTree
+from Constants.Constants import Constants
+
+#need to remove later probably checks for new servers and writes to file wen it finds them
+
 
 def getXML(accessToken, proxies={}):
     import requests
-    return requests.post(ApiPoints.SERVERS, data={"accessToken": accessToken,
-                                                  "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=ApiPoints.exaltHeaders, proxies=proxies).text
+    return requests.post(Constants.apiPoints_SERVERS, data={"accessToken": accessToken,
+                                                  "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=Constants.apiPoints_exaltHeaders, proxies=proxies).text
 
 def parseServers(xml):
-    from xml.etree import ElementTree
     nameToIp = {}
     ipToName = {}
     root = ElementTree.fromstring(xml)

@@ -11,16 +11,11 @@ from Models.PlayerData import PlayerData
 from Models.CharData import CharData
 import Helpers.Servers as ServersHelper
 import Data.MoveRecord as MoveRecord
-import Models.ConditionEffect as ConditionEffect
 import Networking.PacketHelper as PacketHelper
-import Constants.GameIds as GameId
-import Constants.Servers as Servers
-import Constants.ApiPoints as ApiPoints
-import Constants.ClassIds as Classes
 from Client.PacketHookManager import PacketHookManager
 from Networking.PacketHelper import createPacket
 from Helpers.RepeatTimer import RepeatTimer
-
+from Constants.Constants import Constants
 
 MINSPEED = 0.004
 MAXSPEED = 0.0096
@@ -39,8 +34,9 @@ def hook(packetType):
     return decorator
 
 class Client:
-    def __init__(self):
+    def __init__(self,constants:Constants):
         global phm
+        self.constants = constants
         self.guid = ""
         self.password = ""
         self.secret = ""
@@ -63,11 +59,11 @@ class Client:
         self.key = []
         self.keyTime = -1
         self.connectionGuid = ""
-        self.gameId = GameId.nexus
-        self.buildVersion = open("gameVersion.txt").read()
+        self.gameId = self.constants.gameIds.get("nexus")
+        self.buildVersion = constants.gameVersion
         self.clientToken = ""
         self.accessToken = ""
-        self.playerData = PlayerData()
+        self.playerData = PlayerData(self.constants)
         self.charData = CharData()
         self.needsNewChar = False
         self.bulletId = 0
@@ -90,10 +86,10 @@ class Client:
 
         print("Getting token...")
         #Get access token
-        r = requests.post(ApiPoints.VERIFY, data={"guid": self.guid,
+        r = requests.post(self.constants.apiPoints_VERIFY, data={"guid": self.guid,
                                                   "password": self.password,
                                                   "clientToken": self.clientToken,
-                                                  "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=ApiPoints.launcherHeaders, proxies=self.proxies)
+                                                  "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         pattern = r"AccessToken>(.+)</AccessToken>"
         try:
             self.accessToken = re.findall(pattern, r.text)[0]
@@ -102,9 +98,9 @@ class Client:
             self.active = False
             return
         #Verify token
-        r = requests.post(ApiPoints.VERIFYTOKEN, data={"clientToken": self.clientToken,
+        r = requests.post(self.constants.apiPoints_VERIFYTOKEN, data={"clientToken": self.clientToken,
                                                        "accessToken": self.accessToken,
-                                                       "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=ApiPoints.launcherHeaders, proxies=self.proxies)
+                                                       "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         if not "Success" in r.text:
             print("VERIFYING TOKEN ERROR:", r.text)
             self.active = False
@@ -121,18 +117,18 @@ class Client:
         self.proxy = accInfo.get("proxy", {})
 
         #Get char data
-        r = requests.post(ApiPoints.CHAR, data={"do_login": "true",
+        r = requests.post(self.constants.apiPoints_CHAR, data={"do_login": "true",
                                                 "accessToken": self.accessToken,
-                                                "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=ApiPoints.launcherHeaders, proxies=self.proxies)
+                                                "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         while "Account in use" in r.text:
             print(self.guid, "has account in use")
             try:
                 time.sleep(int(re.findall(r"(\d+)", r.text)[0]))
             except IndexError:
                 time.sleep(600)
-            r = requests.post(ApiPoints.CHAR, data={"do_login": "true",
+            r = requests.post(self.constants.apiPoints_CHAR, data={"do_login": "true",
                                                     "accessToken": self.accessToken,
-                                                    "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=ApiPoints.launcherHeaders, proxies=self.proxies)
+                                                    "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         if "Account credentials not valid" in r.text:
             print(self.guid, "got invalid credentials")
             self.active = False
@@ -157,7 +153,7 @@ class Client:
             self.needsNewChar = True
         
         if not "TDone" in r.text:
-            self.gameId = GameId.tutorial
+            self.gameId = self.constants.gameIds.get("tutorial")
             
         self.isReady = True
 
@@ -175,12 +171,12 @@ class Client:
         self.server = accInfo["server"]
         self.connectedTime = int(time.time()*1000)
         
-        self.internalServer = {"host": Servers.nameToIp[self.server],
+        self.internalServer = {"host": self.constants.nameToIp.get(self.server),
                                "name": self.server}
-        self.nexusServer = {"host": Servers.nameToIp[self.server],
+        self.nexusServer = {"host":  self.constants.nameToIp.get(self.server),
                             "name": self.server}
         
-        self.sockMan = SocketManager()
+        self.sockMan = SocketManager(self.constants)
         self.sockMan.clientHook = self.onPacket
     
     def isConnected(self):
@@ -199,28 +195,28 @@ class Client:
         self.sendHelloPacket()
 
     def changeServer(self, server):
-        if not server in Servers.nameToIp.keys():
+        if not server in  self.constants.nameToIp.keys():
             print(server, "is not a valid server")
             return
         self.server = server
-        self.internalServer = {"host": Servers.nameToIp[self.server],
+        self.internalServer = {"host": self.constants.nameToIp[self.server],
                                "name": self.server}
-        self.nexusServer = {"host": Servers.nameToIp[self.server],
+        self.nexusServer = {"host": self.constants.nameToIp[self.server],
                             "name": self.server}
         self.connect()
 
     def getSpeed(self, time):
-        if self.hasEffect(ConditionEffect.SLOWED):
+        if self.hasEffect(self.constants.ConditionEffects.get("SLOWED")):
             return MINSPEED
-        speed = MINSPEED + (self.playerData.spd+self.playerData.spdBoost)/75 * (MAXSPEED-MINSPEED)
-        if self.hasEffect(ConditionEffect.SPEEDY, ConditionEffect.NINJASPEEDY):
+        speed = MINSPEED + (self.playerData.SPEEDSTAT+self.playerData.SPEEDBOOSTSTAT)/75 * (MAXSPEED-MINSPEED)
+        if self.hasEffect(self.constants.ConditionEffects.get("SPEEDY"), self.constants.ConditionEffects.get("NINJASPEEDY")):
             speed *= 1.5
         return speed * time
     
     def nexus(self):
         packet = PacketHelper.createPacket("ESCAPE")
         self.send(packet)
-        self.gameId = GameId.nexus
+        self.gameId = self.constants.gameIds.get("nexus")
         self.key = []
         self.keyTime = -1
 
@@ -279,15 +275,15 @@ class Client:
             self.nextPos.pop(0)
 
     def walkTo(self, target):
-        if self.hasEffect(ConditionEffect.PARALYZED, ConditionEffect.PAUSED, ConditionEffect.PETRIFIED):
+        if self.hasEffect(self.constants.ConditionEffects.get("PARALYZED"), self.constants.ConditionEffects.get("PAUSED"), self.constants.ConditionEffects.get("PETRIFIED")):
             return
         self.pos = target.clone()
 
     def attackFreq(self):
-        if self.hasEffect(ConditionEffect.DAZED):
+        if self.hasEffect(self.constants.ConditionEffects.get("DAZED")):
             return MINFREQ
-        freq = MINFREQ + (self.playerData.dex+self.playerData.dexBoost)/75 * (MAXFREQ - MINFREQ)
-        if self.hasEffect(ConditionEffect.BERSERK):
+        freq = MINFREQ + (self.playerData.DEXTERITYSTAT+self.playerData.DEXTERITYBOOSTSTAT)/75 * (MAXFREQ - MINFREQ)
+        if self.hasEffect(self.constants.ConditionEffects.get("BERSERK")):
             freq *= 1.5
         return freq
 
@@ -300,9 +296,9 @@ class Client:
         if self.clientManager.weapons is None:
             print("Weapons not loaded")
             return False
-        if self.hasEffect(ConditionEffect.STUNNED, ConditionEffect.PAUSED, ConditionEffect.PETRIFIED):
+        if self.hasEffect(self.constants.ConditionEffects.get("STUNNED"), self.constants.ConditionEffects.get("PAUSED"), self.constants.ConditionEffects.get("PETRIFIED")):
             return False
-        if not self.playerData.inv[0] in self.clientManager.weapons.keys():
+        if not self.playerData.INV[0] in self.clientManager.weapons.keys():
             return False
         time = self.getTime()
         attackPeriod = 1 / self.attackFreq() * (1/1)#TODO
@@ -312,9 +308,9 @@ class Client:
 
         shootPacket = PacketHelper.createPacket("PLAYERSHOOT")
         shootPacket.time = time
-        shootPacket.containerType = self.playerData.inv[0]
-        shootPacket.speedMult = self.playerData.projSpeedMult
-        shootPacket.lifeMult = self.playerData.projLifeMult
+        shootPacket.containerType = self.playerData.INV[0]
+        shootPacket.speedMult = self.playerData.PROJSPEEDMULT
+        shootPacket.lifeMult = self.playerData.PROJLIFEMULT
 
         weapon = self.clientManager.weapons[shootPacket.containerType]
         arcRads = weapon.arcGap * math.pi / 180
@@ -336,9 +332,11 @@ class Client:
         return True
 
     def hasEffect(self, *effects):
-        return ConditionEffect.hasEffect(self.playerData.condition, *effects)
+        bits = 0
+        for effect in effects:
+            bits |= 1 << (effect - 1)
+        return (self.playerData.CONDITIONSTAT & bits) != 0
     
-     
     @hook("createSuccess")
     def onCreateSuccess(self, packet):
         self.objectId = packet.objectId
@@ -370,7 +368,7 @@ class Client:
         if self.needsNewChar:
             print("Creating new char")
             create_packet = PacketHelper.createPacket("CREATE")
-            create_packet.classType = Classes.WIZARD
+            create_packet.classType = self.constants.CharacterClasses.get("WIZZARD")
             create_packet.skinType = 0
             create_packet.isChallenger = 0
             self.send(create_packet)
@@ -395,7 +393,7 @@ class Client:
         print(packet.errorDescription)
         self.keyTime = -1
         self.key = []
-        self.gameId = GameId.nexus
+        self.gameId = self.constants.gameIds.get("nexus")
         if packet.errorDescription == "s.update_client":
             self.stop()
         elif packet.errorDescription == "Account credentials not valid":
@@ -467,7 +465,7 @@ class Client:
 
     def onPacket(self, packet):
         self.lastPacketTime = self.getTime()
-        print(packet.type)
+        #print(packet.type)
         self.phm.callHooks(self, packet)
 
     def enterVault(self):
@@ -479,10 +477,10 @@ class Client:
                 break
 
         if vaultPortal:
-            while self.pos.dist(vaultPortal.status.pos) >= 0.25:
+            if self.pos.dist(vaultPortal.status.pos) >= 0.25:
                 self.nextPos = [vaultPortal.status.pos]
                 print("Moving towards vault portal")
-                time.sleep(1)
+                time.sleep(2)
 
             # Once close enough, use the portal
             usePortal = createPacket("USEPORTAL")

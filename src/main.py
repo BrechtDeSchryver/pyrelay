@@ -45,7 +45,7 @@ async def login(account: dict = Body(...)):
         app.clientMan.addClient(account)
         return {"status": "success", "message": "Client added successfully."}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise #HTTPException(status_code=400, detail=str(e))
 
 @app.post("/logout/")
 async def logout(data: dict = Body(...)):
@@ -90,7 +90,6 @@ async def dupe(data: dict = Body(...)):
         return {"status": "success", "message": "Vault was entered."}
     else:
         raise HTTPException(status_code=404)
-
 
 @app.post("/dupe/")
 async def dupe(data: dict = Body(...)):
