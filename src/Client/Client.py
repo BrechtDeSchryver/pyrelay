@@ -3,6 +3,7 @@ import math
 import requests
 import re
 import json as js
+import functools
 
 from Helpers.Random import Random
 from Networking.SocketManager import SocketManager
@@ -16,15 +17,10 @@ import Constants.GameIds as GameId
 import Constants.Servers as Servers
 import Constants.ApiPoints as ApiPoints
 import Constants.ClassIds as Classes
-from PluginManager import callHooks, hook, client
+from Client.PacketHookManager import PacketHookManager
 from Networking.PacketHelper import createPacket
+from Helpers.RepeatTimer import RepeatTimer
 
-from threading import Timer
-
-class RepeatTimer(Timer):
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.function(*self.args, **self.kwargs)
 
 MINSPEED = 0.004
 MAXSPEED = 0.0096
@@ -32,9 +28,19 @@ MAXSPEED = 0.0096
 MINFREQ = 0.0015
 MAXFREQ = 0.008
 
-@client()
+phm=PacketHookManager()
+def hook(packetType):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        phm.addHook(packetType.upper(), wrapper)
+        return wrapper
+    return decorator
+
 class Client:
     def __init__(self):
+        global phm
         self.guid = ""
         self.password = ""
         self.secret = ""
@@ -72,6 +78,8 @@ class Client:
         self.tiles = []
         self.newObjs = []
         self.drops = []
+        self.phm: PacketHookManager = phm
+        self.phm.addClass(self) #change this bogus
 
     def getToken(self, accInfo):
         self.guid = accInfo["guid"]
@@ -330,6 +338,7 @@ class Client:
     def hasEffect(self, *effects):
         return ConditionEffect.hasEffect(self.playerData.condition, *effects)
     
+     
     @hook("createSuccess")
     def onCreateSuccess(self, packet):
         self.objectId = packet.objectId
@@ -459,7 +468,7 @@ class Client:
     def onPacket(self, packet):
         self.lastPacketTime = self.getTime()
         print(packet.type)
-        callHooks(self, packet)
+        self.phm.callHooks(self, packet)
 
     def enterVault(self):
         vaultPortal = None
