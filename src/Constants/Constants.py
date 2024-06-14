@@ -11,6 +11,13 @@ class Constants(BaseSettings):
     apiPoints_CHAR:str = "https://www.realmofthemadgod.com/char/list"
     apiPoints_SERVERS:str = "https://www.realmofthemadgod.com/account/servers"
 
+    MINSPEED:float = 0.004
+    MAXSPEED:float = 0.0096
+
+    MINFREQ:float = 0.0015
+    MAXFREQ:float = 0.008
+
+
     apiPoints_launcherHeaders:dict = {
         "User-Agent": "UnityPlayer/2021.3.16f1 (UnityWebRequest/1.0, libcurl/7.84.0-DEV)",
         "X-Unity-Version": "2021.3.16f1"

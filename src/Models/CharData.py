@@ -1,8 +1,10 @@
+from pydantic import BaseModel
+from typing import List
 
-class CharData:
-    def __init__(self):
-        self.charIds = []
-        self.currentCharId = -1
-        self.nextCharId = -1
-        self.maxNumChars = -1
+class CharDataSchema(BaseModel):
+    charIds: List[int]
+    currentCharId: int
+    nextCharId: int
+    maxNumChars: int
+
         

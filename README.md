@@ -1,8 +1,8 @@
 # pyrelay
 
-pyrelay is a client which can connect to Realm of the Mad God written in [Python](https://www.python.org/).
+pyrelayAPI is an api which can connect to Realm of the Mad God and has endpoints for typical movement options. The goal of this project is to train a Deep neural net to play ROTMG.
 
-This project is inspired by [nrelay](https://github.com/thomas-crane/nrelay)
+This project is a fork of [pyrelay](https://github.com/Maxi35/pyrelay)
 
 ## Installation
 
@@ -12,22 +12,10 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install the pac
 pip install -r requirements.txt
 ```
 
-## Setup
-
-Copy the file `Accounts_ex.json`, rename the copy to `Accounts.json` and remove the comments
-
-Then in the file `Accounts.json` insert the email+password for the account(s) you want to use
-
-Look in `Accounts_ex.json` to see how different accounts and proxies are used.
-
-### Plugins
-
-The folder `Plugins` is where you make the plugins the clients will use.
-
 ### Running
 
-To start the bot simply run pyrelay.py from the cmd
+To start the API simply run main.py from the cmd
 
 ```bash
-pyrelay.py
+main.py
 ```

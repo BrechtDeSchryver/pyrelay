@@ -85,11 +85,41 @@ async def dupe(data: dict = Body(...)):
     guid = data.get("guid")
     if not guid:
         raise HTTPException(status_code=400, detail="DATA WRONG")
-
-    if app.clientMan.letClientEnterVault(guid):
+    client = app.clientMan.getClient(guid)
+    if client.enterVault():
         return {"status": "success", "message": "Vault was entered."}
     else:
         raise HTTPException(status_code=404)
+
+@app.post("/shoot/")
+async def dupe(data: dict = Body(...)):
+    """
+    Endpoint to log out a client by their GUID.
+    """
+    guid = data.get("guid")
+    angle = data.get("angle")
+    if not guid:
+        raise HTTPException(status_code=400, detail="DATA WRONG")
+    client = app.clientMan.getClient(guid)
+    if client.shoot(angle):
+        return {"status": "success", "message": "Vault was entered."}
+    else:
+        return {"status": "failure", "message": "No shot was fires"}
+
+@app.post("/nexus/")
+async def dupe(data: dict = Body(...)):
+    """
+    Endpoint to log out a client by their GUID.
+    """
+    guid = data.get("guid")
+    if not guid:
+        raise HTTPException(status_code=400, detail="DATA WRONG")
+    client = app.clientMan.getClient(guid)
+    if client.nexus():
+        return {"status": "success", "message": "NEXUSED"}
+    else:
+        raise #HTTPException(status_code=404)
+
 
 @app.post("/dupe/")
 async def dupe(data: dict = Body(...)):

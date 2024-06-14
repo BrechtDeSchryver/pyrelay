@@ -8,7 +8,7 @@ import functools
 from Helpers.Random import Random
 from Networking.SocketManager import SocketManager
 from Models.PlayerData import PlayerData
-from Models.CharData import CharData
+from Models.CharData import CharDataSchema
 import Helpers.Servers as ServersHelper
 import Data.MoveRecord as MoveRecord
 import Networking.PacketHelper as PacketHelper
@@ -17,13 +17,7 @@ from Networking.PacketHelper import createPacket
 from Helpers.RepeatTimer import RepeatTimer
 from Constants.Constants import Constants
 
-MINSPEED = 0.004
-MAXSPEED = 0.0096
-
-MINFREQ = 0.0015
-MAXFREQ = 0.008
-
-phm=PacketHookManager()
+phm = PacketHookManager()
 def hook(packetType):
     def decorator(func):
         @functools.wraps(func)
@@ -33,8 +27,9 @@ def hook(packetType):
         return wrapper
     return decorator
 
+
 class Client:
-    def __init__(self,constants:Constants):
+    def __init__(self, constants: Constants):
         global phm
         self.constants = constants
         self.guid = ""
@@ -64,7 +59,10 @@ class Client:
         self.clientToken = ""
         self.accessToken = ""
         self.playerData = PlayerData(self.constants)
-        self.charData = CharData()
+        self.charData = CharDataSchema(charIds=[],
+                                       currentCharId=-1,
+                                       nextCharId=-1,
+                                       maxNumChars=-1)
         self.needsNewChar = False
         self.bulletId = 0
         self.lastAttackTime = 0
@@ -75,7 +73,7 @@ class Client:
         self.newObjs = []
         self.drops = []
         self.phm: PacketHookManager = phm
-        self.phm.addClass(self) #change this bogus
+        self.phm.addClass(self)  # change this bogus
 
     def getToken(self, accInfo):
         self.guid = accInfo["guid"]
@@ -85,22 +83,22 @@ class Client:
         self.proxy = accInfo.get("proxy", {})
 
         print("Getting token...")
-        #Get access token
+        # Get access token
         r = requests.post(self.constants.apiPoints_VERIFY, data={"guid": self.guid,
-                                                  "password": self.password,
-                                                  "clientToken": self.clientToken,
-                                                  "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
+                                                                 "password": self.password,
+                                                                 "clientToken": self.clientToken,
+                                                                 "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         pattern = r"AccessToken>(.+)</AccessToken>"
         try:
             self.accessToken = re.findall(pattern, r.text)[0]
-        except IndexError:#Token not working
+        except IndexError:  # Token not working
             print("GETTING TOKEN ERROR:", r.text)
             self.active = False
             return
-        #Verify token
+        # Verify token
         r = requests.post(self.constants.apiPoints_VERIFYTOKEN, data={"clientToken": self.clientToken,
-                                                       "accessToken": self.accessToken,
-                                                       "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
+                                                                      "accessToken": self.accessToken,
+                                                                      "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         if not "Success" in r.text:
             print("VERIFYING TOKEN ERROR:", r.text)
             self.active = False
@@ -116,10 +114,10 @@ class Client:
         self.alias = accInfo["alias"]
         self.proxy = accInfo.get("proxy", {})
 
-        #Get char data
+        # Get char data
         r = requests.post(self.constants.apiPoints_CHAR, data={"do_login": "true",
-                                                "accessToken": self.accessToken,
-                                                "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
+                                                               "accessToken": self.accessToken,
+                                                               "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         while "Account in use" in r.text:
             print(self.guid, "has account in use")
             try:
@@ -127,20 +125,21 @@ class Client:
             except IndexError:
                 time.sleep(600)
             r = requests.post(self.constants.apiPoints_CHAR, data={"do_login": "true",
-                                                    "accessToken": self.accessToken,
-                                                    "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
+                                                                   "accessToken": self.accessToken,
+                                                                   "game_net": "Unity", "play_platform": "Unity", "game_net_user_id": ""}, headers=self.constants.apiPoints_launcherHeaders, proxies=self.proxies)
         if "Account credentials not valid" in r.text:
             print(self.guid, "got invalid credentials")
             self.active = False
             return
         try:
-            charInfo = re.findall(r'<Chars nextCharId="(\d+)" maxNumChars="(\d+)">', r.text)[0]
+            charInfo = re.findall(
+                r'<Chars nextCharId="(\d+)" maxNumChars="(\d+)">', r.text)[0]
             chars = re.findall(r'<Char id="(\d+)">', r.text)
         except IndexError:
             print(r.text)
             self.active = False
             return
-        
+
         self.charData.nextCharId = int(charInfo[0])
         self.charData.maxNumChars = int(charInfo[1])
         if len(chars) > 0:
@@ -151,10 +150,10 @@ class Client:
             self.charData.currentCharId = self.charData.nextCharId
             self.charData.nextCharId += 1
             self.needsNewChar = True
-        
+
         if not "TDone" in r.text:
             self.gameId = self.constants.gameIds.get("tutorial")
-            
+
         self.isReady = True
 
         try:
@@ -170,15 +169,15 @@ class Client:
     def setup(self, accInfo):
         self.server = accInfo["server"]
         self.connectedTime = int(time.time()*1000)
-        
+
         self.internalServer = {"host": self.constants.nameToIp.get(self.server),
                                "name": self.server}
         self.nexusServer = {"host":  self.constants.nameToIp.get(self.server),
                             "name": self.server}
-        
+
         self.sockMan = SocketManager(self.constants)
         self.sockMan.clientHook = self.onPacket
-    
+
     def isConnected(self):
         return self.sockMan.connected
 
@@ -195,7 +194,7 @@ class Client:
         self.sendHelloPacket()
 
     def changeServer(self, server):
-        if not server in  self.constants.nameToIp.keys():
+        if not server in self.constants.nameToIp.keys():
             print(server, "is not a valid server")
             return
         self.server = server
@@ -207,18 +206,20 @@ class Client:
 
     def getSpeed(self, time):
         if self.hasEffect(self.constants.ConditionEffects.get("SLOWED")):
-            return MINSPEED
-        speed = MINSPEED + (self.playerData.SPEEDSTAT+self.playerData.SPEEDBOOSTSTAT)/75 * (MAXSPEED-MINSPEED)
+            return self.constants.MINSPEED
+        speed = self.constants.MINSPEED + (self.playerData.SPEEDSTAT +
+                            self.playerData.SPEEDBOOSTSTAT)/75 * (self.constants.MAXSPEED-self.constants.MINSPEED)
         if self.hasEffect(self.constants.ConditionEffects.get("SPEEDY"), self.constants.ConditionEffects.get("NINJASPEEDY")):
             speed *= 1.5
         return speed * time
-    
+
     def nexus(self):
         packet = PacketHelper.createPacket("ESCAPE")
         self.send(packet)
         self.gameId = self.constants.gameIds.get("nexus")
         self.key = []
         self.keyTime = -1
+        return True
 
     def sendHelloPacket(self):
         hello_packet = PacketHelper.createPacket("HELLO")
@@ -244,7 +245,7 @@ class Client:
             self.sockMan.disconnect()
         if not self.frameTimeUpdater is None:
             self.frameTimeUpdater.cancel()
-        #Wait half a sec to have less chance of getting a failure packet
+        # Wait half a sec to have less chance of getting a failure packet
         self.connectCooldown = self.getTime() + 500
 
     def stop(self):
@@ -262,14 +263,16 @@ class Client:
         if len(self.nextPos) > 0:
             diff = min(100, time-self.lastFrameTime)
             self.moveTo(self.nextPos[0], diff)
-        self.records.append(MoveRecord.MoveRecord(time, self.pos.x, self.pos.y))
+        self.records.append(MoveRecord.MoveRecord(
+            time, self.pos.x, self.pos.y))
         self.lastFrameTime = time
 
     def moveTo(self, target, time):
         speed = self.getSpeed(time)
         if self.pos.dist(target) > speed:
             angle = math.atan2(target.y-self.pos.y, target.x-self.pos.x)
-            self.walkTo(self.pos + (math.cos(angle) * speed, math.sin(angle) * speed))
+            self.walkTo(self.pos + (math.cos(angle) *
+                        speed, math.sin(angle) * speed))
         else:
             self.walkTo(target)
             self.nextPos.pop(0)
@@ -281,8 +284,9 @@ class Client:
 
     def attackFreq(self):
         if self.hasEffect(self.constants.ConditionEffects.get("DAZED")):
-            return MINFREQ
-        freq = MINFREQ + (self.playerData.DEXTERITYSTAT+self.playerData.DEXTERITYBOOSTSTAT)/75 * (MAXFREQ - MINFREQ)
+            return self.constants.MINFREQ
+        freq = self.constants.MINFREQ + (self.playerData.DEXTERITYSTAT +
+                          self.playerData.DEXTERITYBOOSTSTAT)/75 * (self.constants.MAXFREQ - self.constants.MINFREQ)
         if self.hasEffect(self.constants.ConditionEffects.get("BERSERK")):
             freq *= 1.5
         return freq
@@ -301,7 +305,7 @@ class Client:
         if not self.playerData.INV[0] in self.clientManager.weapons.keys():
             return False
         time = self.getTime()
-        attackPeriod = 1 / self.attackFreq() * (1/1)#TODO
+        attackPeriod = 1 / self.attackFreq() * (1/1)  # TODO
         if time < self.lastAttackTime + attackPeriod:
             return False
         self.lastAttackTime = time
@@ -328,7 +332,7 @@ class Client:
             if arcRads > 0:
                 angle += arcRads
             self.send(shootPacket)
-            
+
         return True
 
     def hasEffect(self, *effects):
@@ -336,13 +340,11 @@ class Client:
         for effect in effects:
             bits |= 1 << (effect - 1)
         return (self.playerData.CONDITIONSTAT & bits) != 0
-    
+
     @hook("createSuccess")
     def onCreateSuccess(self, packet):
         self.objectId = packet.objectId
         self.lastAttackTime = 0
-        print(packet.charId)
-        print(packet.PCStats)
         self.lastFrameTime = self.getTime()
         self.frameTimeUpdater = RepeatTimer(1/10, self.updateFrameTime)
         self.frameTimeUpdater.daemon = True
@@ -352,7 +354,7 @@ class Client:
         show_packet = PacketHelper.createPacket("SHOWALLYSHOOT")
         show_packet.toggle = 1
         self.send(show_packet)
-    
+
     @hook("goto")
     def onGoto(self, packet):
         gotoAck_packet = PacketHelper.createPacket("GOTOACK")
@@ -368,7 +370,8 @@ class Client:
         if self.needsNewChar:
             print("Creating new char")
             create_packet = PacketHelper.createPacket("CREATE")
-            create_packet.classType = self.constants.CharacterClasses.get("WIZZARD")
+            create_packet.classType = self.constants.CharacterClasses.get(
+                "WIZZARD")
             create_packet.skinType = 0
             create_packet.isChallenger = 0
             self.send(create_packet)
@@ -378,10 +381,11 @@ class Client:
             load_packet.charId = self.charData.currentCharId
             self.send(load_packet)
         self.random.setSeed(packet.seed)
-        
+
     @hook("queueInformation")
     def onQueueInformation(self, packet):
-        print("Client", self.alias, f"in queue at position: {packet.curPos}/{packet.maxPos}")
+        print("Client", self.alias,
+              f"in queue at position: {packet.curPos}/{packet.maxPos}")
         self.connectCooldown = self.getTime() + 10*1000
 
     @hook("failure")
@@ -400,7 +404,7 @@ class Client:
             self.stop()
         elif packet.errorDescription == "Bad message received":
             self.disconnect()
-        
+
     @hook("ping")
     def onPing(self, packet):
         pong_packet = PacketHelper.createPacket("PONG")
@@ -414,8 +418,9 @@ class Client:
         move_packet.tickId = packet.tickId
         move_packet.time = packet.serverRealTimeMS
         move_packet.records = self.records
-        if len(move_packet.records) == 0:#Causes dc otherwise
-            move_packet.records = [MoveRecord.MoveRecord(self.lastFrameTime, self.pos.x, self.pos.y)]
+        if len(move_packet.records) == 0:  # Causes dc otherwise
+            move_packet.records = [MoveRecord.MoveRecord(
+                self.lastFrameTime, self.pos.x, self.pos.y)]
         self.records = []
         self.send(move_packet)
         for status in packet.statuses:
@@ -436,7 +441,6 @@ class Client:
             if obj.status.objectId == self.objectId:
                 self.pos = obj.status.pos
                 self.playerData.parse(obj)
-                
 
     @hook("serverPlayerShoot")
     def onServerPlayerShoot(self, packet):
@@ -460,12 +464,12 @@ class Client:
         self.gameId = packet.gameId
         self.key = packet.key
         self.keyTime = packet.keyTime
-        #self.disconnect()
+        # self.disconnect()
         self.connect()
 
     def onPacket(self, packet):
         self.lastPacketTime = self.getTime()
-        #print(packet.type)
+        # print(packet.type)
         self.phm.callHooks(self, packet)
 
     def enterVault(self):
@@ -494,22 +498,34 @@ class Client:
         return False
 
     def to_json(self):
-        default = lambda o: f"<<non-serializable: {type(o).__qualname__}>>"
-        json = js.dumps(self.__dict__,default=default, skipkeys=True, ensure_ascii=True,check_circular=True,indent=4)
+        def default(o): return f"<<non-serializable: {type(o).__qualname__}>>"
+        json = js.dumps(self.__dict__, default=default, skipkeys=True,
+                        ensure_ascii=True, check_circular=True, indent=4)
         json_dict = js.loads(json)
         print(type(json_dict))
-        json_dict["charData"] = js.loads(js.dumps(self.charData.__dict__,default=default,skipkeys=True, ensure_ascii=True,check_circular=True,indent=4))
-        json_dict["playerData"] = js.loads(js.dumps(self.playerData.__dict__,default=default,skipkeys=True, ensure_ascii=True,check_circular=True,indent=4))
+        json_dict["charData"] = js.loads(js.dumps(
+            self.charData.__dict__, default=default, skipkeys=True, ensure_ascii=True, check_circular=True, indent=4))
+        
+        json_dict["playerData"] = js.loads(js.dumps(
+            self.playerData.__dict__, default=default, skipkeys=True, ensure_ascii=True, check_circular=True, indent=4))
+        L=[]
+        for item in self.playerData.INV:
+            L.append(js.loads(js.dumps(item.__dict__, default=default)))
+        json_dict["playerData"]["INV"]
         json_dict["tiles"] = []
         for item in self.tiles:
-            json_dict["tiles"].append(js.loads(js.dumps(item.__dict__,default=default)))
+            json_dict["tiles"].append(
+                js.loads(js.dumps(item.__dict__, default=default)))
         json_dict["newObjs"] = []
         for item in self.newObjs:
-            objs_json=js.loads(js.dumps(item.__dict__,default=default))
-            objs_json["status"]= js.loads(js.dumps(item.status.__dict__,default=default))
-            objs_json["status"]["pos"] = js.loads(js.dumps(item.status.pos.__dict__,default=default))
+            objs_json = js.loads(js.dumps(item.__dict__, default=default))
+            objs_json["status"] = js.loads(
+                js.dumps(item.status.__dict__, default=default))
+            objs_json["status"]["pos"] = js.loads(
+                js.dumps(item.status.pos.__dict__, default=default))
             objs_json["status"]["stats"] = []
             for stat in item.status.stats:
-                objs_json["status"]["stats"].append(js.loads(js.dumps(stat.__dict__,default=default)))
+                objs_json["status"]["stats"].append(
+                    js.loads(js.dumps(stat.__dict__, default=default)))
             json_dict["newObjs"].append(objs_json)
         return json_dict

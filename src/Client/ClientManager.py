@@ -119,8 +119,8 @@ class ClientManager:
                 return True
         return False
 
-    def letClientEnterVault(self, guid):
+    def getClient(self,guid):
         for client in self.clients:
             if client.guid == guid:
-                return client.enterVault()
+                return client
         return False

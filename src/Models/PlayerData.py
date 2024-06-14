@@ -16,14 +16,13 @@ class PlayerData:
     def parseStats(self, stats):
         for stat in stats:
             attribute_key = self.constants.intToStatTypes.get(stat.statType)
-            print(attribute_key)
             if attribute_key:
                 if self.constants.statTypesToInt.get("INVENTORY0STAT") <= stat.statType <= self.constants.statTypesToInt.get("INVENTORY11STAT"):
                     index = stat.statType - self.constants.statTypesToInt.get("INVENTORY0STAT")
-                    self.INV[index] = stat.statValue
+                    self.INV[index] = stat
                 elif self.constants.statTypesToInt.get("BACKPACK0STAT") <= stat.statType <= self.constants.statTypesToInt.get("BACKPACK7STAT"):
                     index = stat.statType - self.constants.statTypesToInt.get("BACKPACK0STAT") + 12
-                    self.INV[index] = stat.statValue
+                    self.INV[index] = stat
                 elif attribute_key in ['HASBACKPACK', 'NAMECHOSEN', 'XPBOOSTED']:
                     setattr(self, attribute_key, bool(stat.statValue))
                 elif attribute_key in ['PROJSPEEDMULT', 'PROJLIFEMULT', 'EXALTATIONBONUSDMG']:
